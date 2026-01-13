@@ -43,7 +43,6 @@ services:
           type: web
           name: ebay-arbitrage-api
           property: host
-        value: https://ebay-arbitrage-api.onrender.com
 
 databases:
   - name: ebay-arbitrage-db
