@@ -3,8 +3,17 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from app.core.config import settings
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+# Optionnel : Importer le scraper comme fallback
+try:
+    from app.services.ebay_scraper import eBayScraper
+    SCRAPING_AVAILABLE = True
+except ImportError:
+    SCRAPING_AVAILABLE = False
+    logger.info("Scraping non disponible (beautifulsoup4 non installé)")
 
 
 class eBayService:
@@ -20,6 +29,16 @@ class eBayService:
         self.base_url_browse = "https://api.ebay.com/buy/browse/v1"
         self.base_url_finding = "https://svcs.ebay.com/services/search/FindingService/v1"
         self.access_token: Optional[str] = None
+        
+        # Scraper comme fallback ou mode principal
+        self.use_scraper_fallback = getattr(settings, 'use_scraper_fallback', True)
+        self.use_scraping_mode = getattr(settings, 'use_scraping_mode', True)
+        
+        # Initialiser le scraper si disponible et nécessaire
+        if SCRAPING_AVAILABLE and (self.use_scraper_fallback or self.use_scraping_mode):
+            self.scraper = eBayScraper()
+        else:
+            self.scraper = None
     
     async def _get_access_token(self) -> str:
         """
@@ -49,6 +68,8 @@ class eBayService:
         """
         Recherche les ventes complétées sur eBay.
         
+        Utilise le scraping si les clés API ne sont pas configurées.
+        
         Args:
             query: Terme de recherche (ex: "Pokemon Charizard PSA")
             days_back: Nombre de jours en arrière pour les ventes
@@ -59,6 +80,27 @@ class eBayService:
         Returns:
             Liste de dictionnaires contenant les données des ventes
         """
+        # Si pas de clés API ou mode scraping activé, utiliser le scraper
+        if (not self.app_id or self.app_id == "your_ebay_app_id" or 
+            settings.use_scraping_mode or self.scraper):
+            logger.info("Utilisation du scraping (pas de clés API ou mode scraping activé)")
+            if self.scraper:
+                return await self.scraper.scrape_completed_listings(
+                    search_query=f"{query} {psa_grade}" if psa_grade else query,
+                    max_results=limit,
+                    days_back=days_back
+                )
+            elif SCRAPING_AVAILABLE:
+                scraper = eBayScraper()
+                return await scraper.scrape_completed_listings(
+                    search_query=f"{query} {psa_grade}" if psa_grade else query,
+                    max_results=limit,
+                    days_back=days_back
+                )
+            else:
+                logger.warning("Scraping non disponible, retour liste vide")
+                return []
+        
         try:
             # API Finding pour les ventes complétées
             params = {
@@ -105,6 +147,19 @@ class eBayService:
                 
         except Exception as e:
             logger.error(f"Erreur lors de la recherche de ventes complétées: {e}")
+            
+            # Fallback sur scraping si disponible et activé
+            if self.scraper and self.use_scraper_fallback:
+                logger.warning("Utilisation du scraper comme fallback (non recommandé)")
+                try:
+                    return await self.scraper.scrape_completed_listings(
+                        query=query,
+                        days_back=days_back,
+                        max_results=limit
+                    )
+                except Exception as scrape_error:
+                    logger.error(f"Erreur lors du scraping: {scrape_error}")
+            
             return []
     
     def _parse_completed_item(self, item: Dict) -> Dict:
@@ -210,6 +265,65 @@ class eBayService:
                 
         except Exception as e:
             logger.error(f"Erreur lors de la recherche de listings actifs: {e}")
+            
+            # Fallback sur scraping si disponible
+            if self.scraper and self.use_scraper_fallback:
+                logger.warning("Utilisation du scraper comme fallback")
+                try:
+                    return await self._scrape_active_listings(query, limit)
+                except Exception as scrape_error:
+                    logger.error(f"Erreur lors du scraping: {scrape_error}")
+            
+            return []
+    
+    async def _scrape_active_listings(self, query: str, limit: int) -> List[Dict]:
+        """Scrape les listings actifs depuis la page de recherche eBay"""
+        if not SCRAPING_AVAILABLE:
+            return []
+        
+        scraper = self.scraper or eBayScraper()
+        
+        # Scraper la page de recherche normale (pas les ventes complétées)
+        try:
+            scraper._rate_limit()
+            
+            params = {
+                "_nkw": query,
+                "_sop": "15",  # Trier par prix croissant
+                "LH_BIN": "1",  # Buy It Now seulement
+                "_ipg": "200",
+            }
+            
+            async with httpx.AsyncClient(
+                headers=scraper.headers,
+                timeout=30.0,
+                follow_redirects=True
+            ) as client:
+                response = await client.get(
+                    f"{scraper.base_url}/sch/i.html",
+                    params=params
+                )
+                response.raise_for_status()
+                
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(response.text, "html.parser")
+                
+                listings = []
+                items = soup.find_all("li", class_=re.compile(r"s-item"))
+                
+                if not items:
+                    items = soup.find_all("div", class_=re.compile(r"s-item"))
+                
+                for item in items[:limit]:
+                    listing_data = scraper._parse_listing_item(item)
+                    if listing_data:
+                        # Pour les listings actifs, pas de sold_date
+                        listing_data.pop("sold_date", None)
+                        listings.append(listing_data)
+                
+                return listings
+        except Exception as e:
+            logger.error(f"Erreur lors du scraping des listings actifs: {e}")
             return []
     
     def _parse_active_item(self, item: Dict) -> Dict:

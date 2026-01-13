@@ -1,4 +1,5 @@
 .env
+.env.local
 __pycache__/
 *.pyc
 *.pyo
@@ -18,4 +19,10 @@ htmlcov/
 .DS_Store
 alembic/versions/*.py
 !alembic/versions/__init__.py
-
+*.db
+*.sqlite
+*.sqlite3
+node_modules/
+.next/
+out/
+.vercel

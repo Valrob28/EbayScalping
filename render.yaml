@@ -1,0 +1,53 @@
+services:
+  # Backend FastAPI
+  - type: web
+    name: ebay-arbitrage-api
+    env: python
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.18
+      - key: EBAY_APP_ID
+        sync: false
+      - key: EBAY_CLIENT_ID
+        sync: false
+      - key: EBAY_CLIENT_SECRET
+        sync: false
+      - key: SHIPPING_COST
+        value: 5.0
+      - key: ARBITRAGE_THRESHOLD
+        value: 0.8
+      - key: MIN_SALES_FOR_FLOOR
+        value: 5
+      - key: MAX_SALES_FOR_FLOOR
+        value: 10
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: ebay-arbitrage-web
+          property: host
+
+  # Frontend Next.js
+  - type: web
+    name: ebay-arbitrage-web
+    env: node
+    rootDir: web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.18.0
+      - key: NEXT_PUBLIC_FASTAPI_URL
+        fromService:
+          type: web
+          name: ebay-arbitrage-api
+          property: host
+        value: https://ebay-arbitrage-api.onrender.com
+
+databases:
+  - name: ebay-arbitrage-db
+    databaseName: ebay_arbitrage
+    user: ebay_user
+    plan: free
+
