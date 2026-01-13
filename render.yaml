@@ -3,6 +3,7 @@ services:
   - type: web
     name: ebay-arbitrage-api
     env: python
+    plan: free
     buildCommand: pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -32,6 +33,7 @@ services:
   - type: web
     name: ebay-arbitrage-web
     env: node
+    plan: free
     rootDir: web
     buildCommand: npm install && npm run build
     startCommand: npm start
