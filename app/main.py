@@ -6,23 +6,27 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS (obligatoire pour Next.js)
+# =========================
+# CORS
+# =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # en prod tu pourras restreindre
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# =========================
+# ROOT
+# =========================
 @app.get("/")
 def root():
     return {"status": "ok"}
 
-# ============================
-# DASHBOARD MARKET STATS
-# ============================
-
+# =========================
+# MARKET STATS
+# =========================
 @app.get("/api/dashboard/market-stats")
 def get_market_stats():
     return {
@@ -51,3 +55,8 @@ def get_market_stats():
             },
             {
                 "language": "DE",
+                "average_price": 210.00,
+                "sales_count": 117
+            }
+        ]
+    }
