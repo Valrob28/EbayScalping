@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import Navigation from "@/components/Navigation";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Ebay Scalping Dashboard",
-  description: "Dashboard d'analyse et d'arbitrage de cartes TCG",
+  title: "TCG Market - Trading Cards Dashboard & Scanner",
+  description: "CoinMarketCap pour cartes à collectionner avec scanner IA et analyse de marché",
 };
 
 export default function RootLayout({
@@ -12,8 +16,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
-      <body className="bg-background text-foreground antialiased">
+    <html lang="fr" className="dark">
+      <body className={inter.className}>
+        <Navigation />
         {children}
       </body>
     </html>
