@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "TCG Market - Trading Cards Dashboard & Scanner",
-  description: "CoinMarketCap pour cartes à collectionner avec scanner IA et analyse de marché",
+  description: "cartes à collectionner avec scanner IA et analyse de marché",
 };
 
 export default function RootLayout({
@@ -24,3 +24,4 @@ export default function RootLayout({
     </html>
   );
 }
+
